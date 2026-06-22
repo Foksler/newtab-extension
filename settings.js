@@ -209,6 +209,69 @@ function renderSettingsPanel(settings, onSave) {
       return;
     }
   });
+
+  // Drag-and-drop reordering of links (within a group)
+  let draggingEntry = null;
+
+  // Only allow a row to be dragged when the grab starts on its handle,
+  // so text inputs stay selectable.
+  container.addEventListener('mousedown', (e) => {
+    const entry = e.target.closest('.link-entry');
+    if (entry) entry.draggable = !!e.target.closest('.drag-handle');
+  });
+
+  container.addEventListener('dragstart', (e) => {
+    const entry = e.target.closest('.link-entry');
+    if (!entry || !entry.draggable) return;
+    draggingEntry = entry;
+    entry.classList.add('dragging');
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', entry.dataset.linkId);
+  });
+
+  container.addEventListener('dragover', (e) => {
+    if (!draggingEntry) return;
+    const list = e.target.closest('.links-list');
+    // Constrain reordering to the same group's list
+    if (!list || list !== draggingEntry.parentElement) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+
+    const after = getDragAfterElement(list, e.clientY);
+    if (after == null) {
+      list.appendChild(draggingEntry);
+    } else if (after !== draggingEntry) {
+      list.insertBefore(draggingEntry, after);
+    }
+  });
+
+  container.addEventListener('dragend', () => {
+    if (!draggingEntry) return;
+    const entry = draggingEntry;
+    const list = entry.parentElement;
+    entry.classList.remove('dragging');
+    entry.draggable = false;
+    draggingEntry = null;
+
+    const group = findGroup(settings, entry.dataset.groupId);
+    if (group && list) {
+      const orderedIds = [...list.querySelectorAll('.link-entry')].map(el => el.dataset.linkId);
+      group.links.sort((a, b) => orderedIds.indexOf(a.id) - orderedIds.indexOf(b.id));
+      onSave(settings);
+    }
+  });
+}
+
+function getDragAfterElement(list, y) {
+  const entries = [...list.querySelectorAll('.link-entry:not(.dragging)')];
+  return entries.reduce((closest, child) => {
+    const box = child.getBoundingClientRect();
+    const offset = y - box.top - box.height / 2;
+    if (offset < 0 && offset > closest.offset) {
+      return { offset, element: child };
+    }
+    return closest;
+  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
 }
 
 function renderGroupSettings(group) {
@@ -241,7 +304,12 @@ function renderGroupSettings(group) {
 function renderLinkEntry(groupId, link) {
   const el = document.createElement('div');
   el.className = 'link-entry';
+  el.dataset.groupId = groupId;
+  el.dataset.linkId = link.id;
   el.innerHTML = `
+    <span class="drag-handle" title="Drag to reorder">
+      <svg width="10" height="16" viewBox="0 0 10 16" fill="currentColor"><circle cx="3" cy="3" r="1.2"/><circle cx="7" cy="3" r="1.2"/><circle cx="3" cy="8" r="1.2"/><circle cx="7" cy="8" r="1.2"/><circle cx="3" cy="13" r="1.2"/><circle cx="7" cy="13" r="1.2"/></svg>
+    </span>
     <input type="text" value="${escapeAttr(link.name)}" placeholder="Name" data-group-id="${groupId}" data-link-id="${link.id}" data-link-field="name">
     <input type="url" value="${escapeAttr(link.url)}" placeholder="https://..." data-group-id="${groupId}" data-link-id="${link.id}" data-link-field="url">
     <button class="btn-icon" data-action="delete-link" data-group-id="${groupId}" data-link-id="${link.id}" title="Remove">&times;</button>

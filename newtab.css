@@ -474,6 +474,28 @@ input[type="checkbox"] {
   flex: 1;
 }
 
+.link-entry.dragging {
+  opacity: 0.4;
+}
+
+.link-entry .drag-handle {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--text-muted);
+  cursor: grab;
+  padding: 0 2px;
+  touch-action: none;
+}
+
+.link-entry .drag-handle:hover {
+  color: var(--text);
+}
+
+.link-entry .drag-handle:active {
+  cursor: grabbing;
+}
+
 /* Buttons */
 .btn {
   padding: 6px 12px;
