@@ -125,6 +125,28 @@ body {
   border: 1px solid var(--border);
   border-radius: 12px;
   padding: 16px 20px;
+  cursor: grab;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+.group.dragging {
+  opacity: 0.4;
+}
+
+/* Empty grid cell shown while a group is dragged */
+.grid-slot {
+  min-height: 120px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  transition: border-color 0.15s, background 0.15s;
+}
+
+/* Group or cell under the dragged link/group */
+.group.drop-target,
+.grid-slot.drop-target,
+.group-settings.drop-target {
+  border-color: var(--accent);
+  background: var(--surface-hover);
 }
 
 .group h2 {
@@ -156,6 +178,10 @@ body {
 
 .group-links a:hover {
   background: var(--link-hover);
+}
+
+.group-links a.dragging {
+  opacity: 0.4;
 }
 
 /* Settings Toggle */

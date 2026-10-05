@@ -7,6 +7,8 @@ A minimal Chrome extension that replaces the new tab page with a customizable gr
 ## Features
 
 - Organize links into named groups arranged on a CSS Grid
+- Drag-and-drop links to reorder them or move them to another group, on the page and in settings
+- Drag a group card onto another group to swap them, or onto an empty grid cell to move it
 - Configurable grid dimensions (columns × rows)
 - Clock with 12h/24h format, optional date display, and 6 position options
 - Background options: solid color or gradient

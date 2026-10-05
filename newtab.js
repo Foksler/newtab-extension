@@ -36,6 +36,8 @@ document.addEventListener('DOMContentLoaded', async () => {
   await Storage.save(currentSettings);
 
   renderGroups(currentSettings);
+  initLinkDragAndDrop();
+  initGroupDragAndDrop();
   applyBackground(currentSettings);
   applyClock(currentSettings);
   startClock(currentSettings);
@@ -52,6 +54,7 @@ function renderGroups(settings) {
     const section = document.createElement('section');
     section.className = 'group';
     section.dataset.groupId = group.id;
+    section.draggable = true;
     section.style.gridRow = group.gridRow;
     section.style.gridColumn = group.gridColumn;
 
@@ -61,12 +64,14 @@ function renderGroups(settings) {
 
     const linksGrid = document.createElement('div');
     linksGrid.className = 'group-links';
+    linksGrid.dataset.groupId = group.id;
     linksGrid.style.gridTemplateColumns = `repeat(${group.columns}, 1fr)`;
 
     group.links.forEach(link => {
       const a = document.createElement('a');
       a.href = link.url;
       a.title = link.url;
+      a.dataset.linkId = link.id;
 
       const span = document.createElement('span');
       span.textContent = link.name || link.url;
@@ -79,6 +84,99 @@ function renderGroups(settings) {
     grid.appendChild(section);
   });
 
+}
+
+// Drag links on the page to reorder them or move them to another group
+function initLinkDragAndDrop() {
+  enableLinkDragAndDrop(document.getElementById('groups-grid'), {
+    zone: '.group',
+    list: '.group-links',
+    item: 'a',
+    onMove: async (linkId, groupId, beforeId) => {
+      moveLink(currentSettings, linkId, groupId, beforeId);
+      await Storage.save(currentSettings);
+      renderGroups(currentSettings);
+      renderGroupsList(currentSettings);
+    },
+    onCancel: () => renderGroups(currentSettings),
+  });
+}
+
+// Drag a group card onto another group to swap them, or onto an empty cell to move it.
+// The whole card is the handle; links inside it start their own drag.
+function initGroupDragAndDrop() {
+  const grid = document.getElementById('groups-grid');
+  let dragging = null;
+  let dropped = false;
+
+  const dropTarget = (el) => {
+    const target = el.closest('.group, .grid-slot');
+    return target !== dragging ? target : null;
+  };
+  const clearHighlight = highlightDropTarget(grid, (el) => dragging && dropTarget(el));
+
+  grid.addEventListener('dragstart', (e) => {
+    if (!e.target.classList?.contains('group')) return;
+    dragging = e.target;
+    dropped = false;
+    e.dataTransfer.effectAllowed = 'move';
+    // Deferred: Chrome takes the drag image after dragstart and can abort
+    // the drag when the layout changes inside it
+    requestAnimationFrame(() => {
+      if (!dragging) return;
+      dragging.classList.add('dragging');
+      renderGridSlots(currentSettings);
+    });
+  });
+
+  grid.addEventListener('dragover', (e) => {
+    if (!dragging || !dropTarget(e.target)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+  });
+
+  grid.addEventListener('drop', (e) => {
+    const target = dragging && dropTarget(e.target);
+    if (!target) return;
+    e.preventDefault();
+    dropped = true;
+
+    const other = findGroup(currentSettings, target.dataset.groupId);
+    moveGroup(currentSettings, dragging.dataset.groupId,
+      other ? other.gridRow : Number(target.dataset.row),
+      other ? other.gridColumn : Number(target.dataset.col));
+  });
+
+  grid.addEventListener('dragend', async () => {
+    if (!dragging) return;
+    dragging = null;
+    clearHighlight();
+    // Also removes the slots and restores the card after a cancelled drag
+    renderGroups(currentSettings);
+    if (dropped) {
+      await Storage.save(currentSettings);
+      renderGroupsList(currentSettings);
+    }
+  });
+}
+
+// Empty cells of the configured grid become drop slots while a group is dragged
+function renderGridSlots(settings) {
+  const grid = document.getElementById('groups-grid');
+  const taken = new Set(settings.groups.map(g => `${g.gridRow}/${g.gridColumn}`));
+
+  for (let row = 1; row <= settings.gridRows; row++) {
+    for (let col = 1; col <= settings.gridColumns; col++) {
+      if (taken.has(`${row}/${col}`)) continue;
+      const slot = document.createElement('div');
+      slot.className = 'grid-slot';
+      slot.dataset.row = row;
+      slot.dataset.col = col;
+      slot.style.gridRow = row;
+      slot.style.gridColumn = col;
+      grid.appendChild(slot);
+    }
+  }
 }
 
 async function applyBackground(settings) {

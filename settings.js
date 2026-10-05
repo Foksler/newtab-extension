@@ -103,10 +103,7 @@ function renderSettingsPanel(settings, onSave) {
   });
 
   const groupsList = container.querySelector('#groups-list');
-
-  settings.groups.forEach((group) => {
-    groupsList.appendChild(renderGroupSettings(group));
-  });
+  renderGroupsList(settings);
 
   // Event delegation
   const debouncedSave = debounce(() => onSave(settings), 300);
@@ -210,9 +207,7 @@ function renderSettingsPanel(settings, onSave) {
     }
   });
 
-  // Drag-and-drop reordering of links (within a group)
-  let draggingEntry = null;
-
+  // Drag-and-drop of links: reorder within a group or move to another group.
   // Only allow a row to be dragged when the grab starts on its handle,
   // so text inputs stay selectable.
   container.addEventListener('mousedown', (e) => {
@@ -220,58 +215,23 @@ function renderSettingsPanel(settings, onSave) {
     if (entry) entry.draggable = !!e.target.closest('.drag-handle');
   });
 
-  container.addEventListener('dragstart', (e) => {
-    const entry = e.target.closest('.link-entry');
-    if (!entry || !entry.draggable) return;
-    draggingEntry = entry;
-    entry.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/plain', entry.dataset.linkId);
-  });
-
-  container.addEventListener('dragover', (e) => {
-    if (!draggingEntry) return;
-    const list = e.target.closest('.links-list');
-    // Constrain reordering to the same group's list
-    if (!list || list !== draggingEntry.parentElement) return;
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
-
-    const after = getDragAfterElement(list, e.clientY);
-    if (after == null) {
-      list.appendChild(draggingEntry);
-    } else if (after !== draggingEntry) {
-      list.insertBefore(draggingEntry, after);
-    }
-  });
-
-  container.addEventListener('dragend', () => {
-    if (!draggingEntry) return;
-    const entry = draggingEntry;
-    const list = entry.parentElement;
-    entry.classList.remove('dragging');
-    entry.draggable = false;
-    draggingEntry = null;
-
-    const group = findGroup(settings, entry.dataset.groupId);
-    if (group && list) {
-      const orderedIds = [...list.querySelectorAll('.link-entry')].map(el => el.dataset.linkId);
-      group.links.sort((a, b) => orderedIds.indexOf(a.id) - orderedIds.indexOf(b.id));
+  enableLinkDragAndDrop(container, {
+    zone: '.group-settings',
+    list: '.links-list',
+    item: '.link-entry',
+    onMove: (linkId, groupId, beforeId) => {
+      moveLink(settings, linkId, groupId, beforeId);
+      // Re-render so a row moved to another group picks up its new data-group-id
+      renderGroupsList(settings);
       onSave(settings);
-    }
+    },
+    onCancel: () => renderGroupsList(settings),
   });
 }
 
-function getDragAfterElement(list, y) {
-  const entries = [...list.querySelectorAll('.link-entry:not(.dragging)')];
-  return entries.reduce((closest, child) => {
-    const box = child.getBoundingClientRect();
-    const offset = y - box.top - box.height / 2;
-    if (offset < 0 && offset > closest.offset) {
-      return { offset, element: child };
-    }
-    return closest;
-  }, { offset: Number.NEGATIVE_INFINITY, element: null }).element;
+function renderGroupsList(settings) {
+  const groupsList = document.getElementById('groups-list');
+  groupsList.replaceChildren(...settings.groups.map(group => renderGroupSettings(group)));
 }
 
 function renderGroupSettings(group) {
@@ -289,7 +249,7 @@ function renderGroupSettings(group) {
       <label>Row <input type="number" min="1" max="6" value="${group.gridRow}" data-group-id="${group.id}" data-group-field="gridRow"></label>
       <label>Col <input type="number" min="1" max="6" value="${group.gridColumn}" data-group-id="${group.id}" data-group-field="gridColumn"></label>
     </div>
-    <div class="links-list"></div>
+    <div class="links-list" data-group-id="${group.id}"></div>
     <button class="btn btn-add btn-small" data-action="add-link" data-group-id="${group.id}" style="margin-top:6px">+ Add Link</button>
   `;
 
@@ -319,6 +279,32 @@ function renderLinkEntry(groupId, link) {
 
 function findGroup(settings, id) {
   return settings.groups.find(g => g.id === id);
+}
+
+// Move a link into groupId, before the link beforeId (or to the end).
+function moveLink(settings, linkId, groupId, beforeId) {
+  const from = settings.groups.find(g => g.links.some(l => l.id === linkId));
+  const to = findGroup(settings, groupId);
+  if (!from || !to) return;
+
+  const link = from.links.find(l => l.id === linkId);
+  from.links = from.links.filter(l => l.id !== linkId);
+  const index = to.links.findIndex(l => l.id === beforeId);
+  to.links.splice(index === -1 ? to.links.length : index, 0, link);
+}
+
+// Place a group at row/col, swapping it with the group already there.
+function moveGroup(settings, groupId, row, col) {
+  const group = findGroup(settings, groupId);
+  if (!group) return;
+
+  const other = settings.groups.find(g => g !== group && g.gridRow === row && g.gridColumn === col);
+  if (other) {
+    other.gridRow = group.gridRow;
+    other.gridColumn = group.gridColumn;
+  }
+  group.gridRow = row;
+  group.gridColumn = col;
 }
 
 function clampInt(value, min, max) {
