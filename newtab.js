@@ -1,38 +1,8 @@
-const DEFAULT_SETTINGS = {
-  version: 1,
-  gridColumns: 3,
-  gridRows: 2,
-  background: {
-    type: 'solid',
-    color: '#0f1114',
-    gradientFrom: '#0f1114',
-    gradientTo: '#1a2332',
-    gradientAngle: 135,
-  },
-  clock: {
-    format: '24h',
-    showDate: false,
-    position: 'top-center',
-  },
-  groups: []
-};
-
 let currentSettings = null;
 
 document.addEventListener('DOMContentLoaded', async () => {
   currentSettings = await Storage.load();
-
-  if (!currentSettings) {
-    currentSettings = DEFAULT_SETTINGS;
-    await Storage.save(currentSettings);
-  }
-
-  if (!currentSettings.background) {
-    currentSettings.background = DEFAULT_SETTINGS.background;
-  }
-  if (!currentSettings.clock) {
-    currentSettings.clock = DEFAULT_SETTINGS.clock;
-  }
+  // Persist the filled-in defaults
   await Storage.save(currentSettings);
 
   renderGroups(currentSettings);

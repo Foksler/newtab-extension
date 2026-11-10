@@ -13,6 +13,12 @@ A minimal Chrome extension that replaces the new tab page with a customizable gr
 - Clock with 12h/24h format, optional date display, and 6 position options
 - Background options: solid color or gradient
 - Settings panel with an expanded full-screen mode
+- Quick-actions palette on any page: press **right Option + /** to search your links and jump to them
+  (Enter — current tab, ⌘Enter — new tab, Esc — close)
+- Page actions: regex rules over the current URL that add context links to the palette
+  (e.g. on any GitLab MR — "Group merge requests", "Project merge requests"); edit them in Settings → Page Actions
+- On `chrome://` pages, where extensions can't inject scripts, click the toolbar icon (or bind a key to
+  "Activate the extension" in `chrome://extensions/shortcuts`) to get the same palette as a popup
 
 ## Installation
 

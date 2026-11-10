@@ -68,6 +68,14 @@ function renderSettingsPanel(settings, onSave) {
           </div>
         </div>
       </div>
+      <div class="settings-section">
+        <label>Backup</label>
+        <div class="settings-card backup-actions">
+          <button class="btn btn-add btn-small" data-action="export-settings">Export</button>
+          <button class="btn btn-add btn-small" data-action="import-settings">Import</button>
+          <input type="file" id="import-file" accept="application/json,.json" hidden>
+        </div>
+      </div>
     </div>
     <div class="settings-main">
       <div class="settings-section">
@@ -76,6 +84,14 @@ function renderSettingsPanel(settings, onSave) {
           <button class="btn btn-add btn-small" data-action="add-group">+ Add Group</button>
         </div>
         <div id="groups-list"></div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-header">
+          <label>Page Actions</label>
+          <button class="btn btn-add btn-small" data-action="add-rule">+ Add Rule</button>
+        </div>
+        <p class="settings-help">Shown in the quick-actions palette (right Option + /) when the page URL matches the regex. In the target URL, $1, $2… are the regex capture groups.</p>
+        <div id="rules-list"></div>
       </div>
     </div>
   `;
@@ -104,6 +120,8 @@ function renderSettingsPanel(settings, onSave) {
 
   const groupsList = container.querySelector('#groups-list');
   renderGroupsList(settings);
+  const rulesList = container.querySelector('#rules-list');
+  rulesList.replaceChildren(...settings.rules.map(renderRuleEntry));
 
   // Event delegation
   const debouncedSave = debounce(() => onSave(settings), 300);
@@ -131,6 +149,17 @@ function renderSettingsPanel(settings, onSave) {
       if (group) {
         group[el.dataset.groupField] = clampInt(el.value, 1, parseInt(el.max) || 6);
         onSave(settings);
+      }
+      return;
+    }
+
+    // Page action rule fields
+    if (el.dataset.ruleField) {
+      const rule = settings.rules.find(r => r.id === el.dataset.ruleId);
+      if (rule) {
+        rule[el.dataset.ruleField] = el.value;
+        if (el.dataset.ruleField === 'match') el.classList.toggle('invalid', !isValidRegex(el.value));
+        debouncedSave();
       }
       return;
     }
@@ -163,6 +192,36 @@ function renderSettingsPanel(settings, onSave) {
       };
       settings.groups.push(newGroup);
       groupsList.appendChild(renderGroupSettings(newGroup));
+      onSave(settings);
+      return;
+    }
+
+    if (action === 'export-settings') {
+      const blob = new Blob([JSON.stringify(settings, null, 2)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `newtab-settings-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(a.href);
+      return;
+    }
+
+    if (action === 'import-settings') {
+      container.querySelector('#import-file').click();
+      return;
+    }
+
+    if (action === 'add-rule') {
+      const rule = { id: generateId('r'), name: '', match: '', url: '' };
+      settings.rules.push(rule);
+      rulesList.appendChild(renderRuleEntry(rule));
+      onSave(settings);
+      return;
+    }
+
+    if (action === 'delete-rule') {
+      settings.rules = settings.rules.filter(r => r.id !== btn.dataset.ruleId);
+      btn.closest('.rule-entry').remove();
       onSave(settings);
       return;
     }
@@ -205,6 +264,26 @@ function renderSettingsPanel(settings, onSave) {
       }
       return;
     }
+  });
+
+  // Import replaces all settings with the file's contents, then reloads the page
+  container.querySelector('#import-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    let imported;
+    try {
+      imported = JSON.parse(await file.text());
+    } catch {
+      alert('Not a valid JSON file');
+      return;
+    }
+    if (!Array.isArray(imported?.groups)) {
+      alert('This file has no "groups" — not a settings export');
+      return;
+    }
+    await Storage.save(imported);
+    location.reload();
   });
 
   // Drag-and-drop of links: reorder within a group or move to another group.
@@ -275,6 +354,24 @@ function renderLinkEntry(groupId, link) {
     <button class="btn-icon" data-action="delete-link" data-group-id="${groupId}" data-link-id="${link.id}" title="Remove">&times;</button>
   `;
   return el;
+}
+
+function renderRuleEntry(rule) {
+  const el = document.createElement('div');
+  el.className = 'rule-entry';
+  el.innerHTML = `
+    <div class="rule-row">
+      <input type="text" value="${escapeAttr(rule.name)}" placeholder="Action name" data-rule-id="${rule.id}" data-rule-field="name">
+      <button class="btn-icon" data-action="delete-rule" data-rule-id="${rule.id}" title="Remove">&times;</button>
+    </div>
+    <input type="text" class="mono${isValidRegex(rule.match) ? '' : ' invalid'}" value="${escapeAttr(rule.match)}" placeholder="Page URL regex, e.g. ^https://gitlab\.com/(.+)/-/" spellcheck="false" data-rule-id="${rule.id}" data-rule-field="match">
+    <input type="text" class="mono" value="${escapeAttr(rule.url)}" placeholder="Target URL, e.g. https://gitlab.com/$1/-/merge_requests" spellcheck="false" data-rule-id="${rule.id}" data-rule-field="url">
+  `;
+  return el;
+}
+
+function isValidRegex(source) {
+  try { new RegExp(source); return true; } catch { return false; }
 }
 
 function findGroup(settings, id) {

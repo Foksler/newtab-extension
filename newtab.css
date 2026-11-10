@@ -422,7 +422,8 @@ input[type="checkbox"] {
 }
 
 /* Group Settings */
-.group-settings {
+.group-settings,
+.rule-entry {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 8px;
@@ -613,4 +614,43 @@ input[type="range"] {
   border-radius: 6px;
   border: 1px solid var(--input-border);
   margin-top: 8px;
+}
+
+/* Page action rules (quick-actions palette) */
+.settings-help {
+  font-size: 0.8rem;
+  color: var(--text-muted);
+  line-height: 1.4;
+  margin-bottom: 12px;
+}
+
+.rule-entry {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.rule-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.rule-row input[type="text"] {
+  flex: 1;
+  font-weight: 600;
+}
+
+.rule-entry input.mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.78rem;
+}
+
+.rule-entry input.invalid {
+  border-color: #ef4444;
+}
+
+.backup-actions {
+  display: flex;
+  gap: 8px;
 }
